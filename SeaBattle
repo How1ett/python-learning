@@ -1,0 +1,280 @@
+from random import randint
+
+
+class Errors(Exception):
+    pass
+
+
+class WrongDotsShip(Errors):
+    pass
+
+
+class WrongShot(Errors):
+    def __str__(self):
+        return "Выберите другую клетку"
+
+
+
+class Dot:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+    def __str__(self):
+        return f"({self.x}, {self.y})"
+
+
+class Ships:
+    def __init__(self, start, len, orient):
+        self.start = start
+        self.len = len
+        self.orient = orient
+        self.life = len
+
+    @property
+    def dots(self):
+        all_dots = []
+        for i in range(self.len):
+            cords_x = self.start.x
+            cords_y = self.start.y
+
+            if self.orient == 0:
+                cords_x += i
+            else:
+                cords_y += i
+
+            all_dots.append(Dot(cords_x, cords_y))
+
+        return all_dots
+
+
+class Board:
+    def __init__(self, hid=False, size=6,):
+        self.size = size
+        self.hid = hid
+        self.board = [["O"] * size for i in range(size)]
+        self.ships = []
+        self.used = []
+        self.death = 0
+
+    def out(self, dot):
+        return not (0 <= dot.x < self.size) and (0 <= dot.y < self.size)
+
+    def contour(self, ship, vision=False):
+        for i in ship.dots:
+
+            if not (self.out(Dot(i.x - 1, i.y))) and Dot(i.x - 1, i.y) not in self.used:
+                if vision:
+                    self.board[i.x - 1][i.y] = "."
+                self.used.append(Dot(i.x - 1, i.y))
+
+            if not (self.out(Dot(i.x + 1, i.y))) and Dot(i.x + 1, i.y) not in self.used:
+                if vision:
+                    self.board[i.x + 1][i.y] = "."
+                self.used.append(Dot(i.x + 1, i.y))
+
+            if not (self.out(Dot(i.x, i.y + 1))) and Dot(i.x, i.y + 1) not in self.used:
+                if vision:
+                    self.board[i.x][i.y + 1] = "."
+                self.used.append(Dot(i.x, i.y + 1))
+
+            if not (self.out(Dot(i.x, i.y - 1))) and Dot(i.x, i.y - 1) not in self.used:
+                if vision:
+                    self.board[i.x][i.y - 1] = "."
+                self.used.append(Dot(i.x, i.y - 1))
+
+            if not (self.out(Dot(i.x + 1, i.y - 1))) and Dot(i.x + 1, i.y - 1) not in self.used:
+                if vision:
+                    self.board[i.x + 1][i.y - 1] = "."
+                self.used.append(Dot(i.x + 1, i.y - 1))
+
+            if not (self.out(Dot(i.x - 1, i.y + 1))) and Dot(i.x - 1, i.y + 1) not in self.used:
+                if vision:
+                    self.board[i.x - 1][i.y + 1] = "."
+                self.used.append(Dot(i.x - 1, i.y + 1))
+
+            if not (self.out(Dot(i.x + 1, i.y + 1))) and Dot(i.x + 1, i.y + 1) not in self.used:
+                if vision:
+                    self.board[i.x + 1][i.y + 1] = "."
+                self.used.append(Dot(i.x + 1, i.y + 1))
+
+            if not (self.out(Dot(i.x - 1, i.y - 1))) and Dot(i.x - 1, i.y - 1) not in self.used:
+                if vision:
+                    self.board[i.x - 1][i.y - 1] = "."
+                self.used.append(Dot(i.x - 1, i.y - 1))
+
+
+    def add_ship(self, ship):
+        for i in ship.dots:
+            if self.out(i) or i in self.used:
+                raise WrongDotsShip
+        for i in ship.dots:
+            self.board[i.x][i.y] = '■'
+            self.used.append(i)
+
+        self.ships.append(ship)
+        self.contour(ship)
+
+    def shot(self, cords):
+        if self.out(cords) or cords in self.used:
+            raise WrongShot
+
+        self.used.append(cords)
+
+        for ship in self.ships:
+            if cords in ship.dots:
+                self.board[cords.x][cords.y] = 'X'
+                ship.life -= 1
+                if ship.life == 0:
+                    self.death += 1
+                    self.contour(ship, vision=True)
+                    print("Корабль уничтожен")
+                    return False
+                else:
+                    print("Корабль подбит")
+                    return True
+
+        self.board[cords.x][cords.y] = "T"
+        print("Промах")
+        return False
+
+    def begin(self):
+        self.used = []
+
+    def __str__(self):
+        res = ""
+        res += "  | 1 | 2 | 3 | 4 | 5 | 6 |"
+        for i, row in enumerate(self.board):
+            res += f"\n{i + 1} | " + " | ".join(row) + " |"
+
+        if self.hid:
+            res = res.replace("■", "O")
+        return res
+
+
+class Player:
+    def __init__(self, board, opponent):
+        self.board = board
+        self.opponent = opponent
+
+    def ask(self):
+        return False
+
+    def move(self):
+        while True:
+            try:
+                move = self.ask()
+                repeat = self.opponent.shot(move)
+                return repeat
+            except:
+                pass
+
+
+class User(Player):
+    def ask(self):
+        while True:
+            cords = input("Сделайте ход:").split()
+
+            if len(cords) != 2:
+                print("Введите 2 координаты через пробел")
+                continue
+
+            x, y = cords
+
+            if x.isdigit() and y.isdigit():
+                x, y = int(x), int(y)
+                return Dot(x - 1, y - 1)
+            else:
+                print("Нужно ввести числа")
+                continue
+
+
+class AI(Player):
+    def ask(self):
+        cords = Dot(randint(0, 5), randint(0, 5))
+        print(f"Ход AI: {cords.x + 1} {cords.y + 1}")
+        return cords
+
+
+class Game:
+    def __init__(self, size=6):
+        self.size = size
+        player = self.random_board()
+        computer = self.random_board()
+        computer.hid = True
+
+        self.ai = AI(computer, player)
+        self.user = User(player, computer)
+
+    def random_board(self):
+        board = None
+        while board is None:
+            board = self.random_place()
+        return board
+
+    def random_place(self):
+        lens = [3, 2, 2, 1, 1, 1, 1]
+        board = Board(size=self.size)
+        attempts = 0
+        for l in lens:
+            while True:
+                attempts += 1
+                if attempts > 2000:
+                    return None
+                ship = Ships(Dot(randint(0, self.size), randint(0, self.size)), l, randint(0, 1))
+                try:
+                    board.add_ship(ship)
+                    break
+                except:
+                    pass
+        board.begin()
+        return board
+
+    def greet(self):
+        print("Добро пожаловать в игру Морской бой")
+        print("Сделайте ваш ход в формате: х y")
+        print("x - номер строки")
+        print("y - номер столбца")
+
+    def loop(self):
+        order = 0
+        while True:
+            print("Доска пользователя:")
+            print(self.user.board)
+            print("X" * 10)
+            print("Доска AI:")
+            print(self.ai.board)
+            if order % 2 == 0:
+                print("X" * 10)
+                print("Ходит пользователь")
+                repeat = self.user.move()
+            else:
+                print("X" * 10)
+                print("Ходит AI")
+                repeat = self.ai.move()
+            if repeat:
+                order -= 1
+            order += 1
+
+            if self.ai.board.death == 7:
+                print("X" * 10)
+                print("Пользователь победил")
+                break
+
+            if self.user.board.death == 7:
+                print("X" * 10)
+                print("AI победил")
+                break
+
+
+    def start(self):
+        self.greet()
+        self.loop()
+
+
+game = Game()
+
+game.start()
